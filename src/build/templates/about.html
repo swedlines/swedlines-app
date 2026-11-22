@@ -53,6 +53,7 @@
   ul.pubs li { margin: 2px 0; }
   .muted { color: var(--muted); font-size: 13px; }
   a { color: var(--blue-ink); }
+  /* biome-ignore lint/complexity/noImportantStyles: the hidden attribute must win over any display rule */
   [hidden] { display: none !important; }
   footer { max-width: 960px; margin: 0 auto; padding: 16px; color: var(--muted); font-size: 12px; border-top: 1px solid var(--line); }
   footer p { margin: 0 0 6px; }
@@ -141,7 +142,7 @@
   let lang = "en";
   try { if (localStorage.getItem("lang") === "sv") lang = "sv"; } catch {}
   if (lang === "en") {
-    const prefs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || "en"]).map(l => String(l).toLowerCase());
+    const prefs = (navigator.languages?.length ? navigator.languages : [navigator.language || "en"]).map(l => String(l).toLowerCase());
     let saved = null; try { saved = localStorage.getItem("lang"); } catch {}
     if (!saved && prefs.some(l => l === "sv" || l.startsWith("sv-"))) lang = "sv";
   }

@@ -184,7 +184,7 @@ export async function translatePending(opts: TranslateOptions): Promise<Translat
     const translatedAt = toStockholmIso(now());
     for (const a of batch) {
       const out = byId.get(a.id);
-      if (!out || !out.title_en.trim()) {
+      if (!out?.title_en.trim()) {
         report.failed++;
         report.errors.push(`${a.id}: missing from model output`);
         continue;
