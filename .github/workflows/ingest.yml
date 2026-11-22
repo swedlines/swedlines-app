@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v5
         if: steps.gate.outputs.enabled == 'true'
         with:
-          repository: nevenc/swedlines-content
+          repository: swedlines/swedlines-content
           token: ${{ secrets.CONTENT_REPO_TOKEN }}
           path: content-repo
       - uses: actions/setup-node@v5

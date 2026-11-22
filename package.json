@@ -1,6 +1,6 @@
 {
   "name": "swedlines",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Swedlines (swedlines.com): dual-language (sv/en) aggregator of Swedish news headlines with a static JSON API, RSS feeds, a headline stream, and a ticker.",
   "homepage": "https://swedlines.com",

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Start the Ingest workflow on GitHub (same as clicking "Run workflow").
 #
-# Needs a fine-grained GitHub token with "Actions: Read and write" on nevenc/swedlines-app.
+# Needs a fine-grained GitHub token with "Actions: Read and write" on swedlines/swedlines-app.
 # Provide it either in $SWEDLINES_GH_TOKEN or in the macOS keychain:
 #   security add-generic-password -a swedlines -s swedlines-cron -w   # prompts for the token
 set -euo pipefail
 
-REPO="nevenc/swedlines-app"
+REPO="swedlines/swedlines-app"
 TOKEN="${SWEDLINES_GH_TOKEN:-}"
 if [ -z "$TOKEN" ] && command -v security >/dev/null; then
   TOKEN="$(security find-generic-password -a swedlines -s swedlines-cron -w 2>/dev/null || true)"

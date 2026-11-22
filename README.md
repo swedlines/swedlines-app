@@ -11,10 +11,10 @@ See [SPEC.md](SPEC.md) for the full specification and [sources.yaml](sources.yam
 Requires Node 24 or newer and git.
 
 ```
-git clone git@github.com:nevenc/swedlines-app.git
+git clone git@github.com:swedlines/swedlines-app.git
 cd swedlines-app
 npm install
-git clone git@github.com:nevenc/swedlines-content.git content-repo   # the data repo, gitignored here
+git clone git@github.com:swedlines/swedlines-content.git content-repo   # the data repo, gitignored here
 
 npm run cli -- ingest        # fetch all ten feeds, write new items into content-repo/content/
 npm run cli -- build         # generate content-repo/docs/ (JSON API + stream page)
