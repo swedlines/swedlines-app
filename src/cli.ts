@@ -6,6 +6,7 @@ import { buildApi } from "./build/api.ts";
 import { serveStatic } from "./build/serve.ts";
 import { buildSite } from "./build/site.ts";
 import { enabledSources, loadSources, SourcesConfigError } from "./config/sources.ts";
+import { clusterPending, createAnthropicClusterer } from "./pipeline/cluster.ts";
 import { commitAll, push } from "./pipeline/git.ts";
 import { commitMessage, ingest } from "./pipeline/ingest.ts";
 import { ContentStore } from "./pipeline/store.ts";
@@ -47,9 +48,14 @@ Commands:
     --in <file...>     One or more JSON files
     --provider <name>  Provenance (default: claude-code)
     --model <id>       Provenance (default: claude-fable-5-1)
+  cluster            Group recent articles that report the same story (Top view; needs ANTHROPIC_API_KEY)
+    --content <dir>    Path to the content repo checkout (default: content-repo)
+    --model <id>       Anthropic model (default: ${DEFAULT_MODEL}, or SWEDLINES_MODEL)
+    --dry-run          Call the model but write nothing
   build              Generate docs/ (static API + site) from the content repo
     --content <dir>    Path to the content repo checkout (default: content-repo)
     --domain <host>    Write a CNAME file for GitHub Pages (or SWEDLINES_DOMAIN env)
+    --top-tab          Show the Top tab on the front page (or SWEDLINES_TOP_TAB=1)
   serve              Serve <content>/docs locally for preview
     --port <n>         Port (default: 8787)
 `;
@@ -252,6 +258,30 @@ async function translateImportCommand(args: string[]): Promise<number> {
   return 0;
 }
 
+async function clusterCommand(args: string[]): Promise<number> {
+  const { values } = parseArgs({
+    args,
+    options: {
+      content: { type: "string", default: "content-repo" },
+      model: { type: "string", default: process.env.SWEDLINES_MODEL || DEFAULT_MODEL },
+      "dry-run": { type: "boolean", default: false },
+    },
+  });
+  const report = await clusterPending({
+    store: new ContentStore(values.content),
+    clusterBatch: createAnthropicClusterer({ model: values.model }),
+    dryRun: values["dry-run"],
+    log: (line) => console.log(line),
+  });
+  console.log(
+    `clustered ${report.candidates} new: joined=${report.joined} started=${report.started} ` +
+      `single=${report.singletons} failed=${report.failed} in ${report.batches} batch(es); ` +
+      `${report.stories} stories kept; tokens in=${report.usage.input} cached=${report.usage.cached} out=${report.usage.output}`,
+  );
+  for (const e of report.errors.slice(0, 10)) console.error(`  ! ${e}`);
+  return report.batches > 0 && report.errors.length === report.batches ? 1 : 0;
+}
+
 /** package.json version plus the current commit of this checkout (GITHUB_SHA in Actions, git otherwise). */
 async function appVersion(): Promise<{ version: string; commit?: string | undefined }> {
   const pkg = JSON.parse(await readFile(join(process.cwd(), "package.json"), "utf8")) as {
@@ -278,6 +308,7 @@ async function buildCommand(args: string[]): Promise<number> {
       content: { type: "string", default: "content-repo" },
       file: { type: "string", default: "sources.yaml" },
       domain: { type: "string", default: process.env.SWEDLINES_DOMAIN },
+      "top-tab": { type: "boolean", default: process.env.SWEDLINES_TOP_TAB === "1" },
     },
   });
   const config = await loadSources(values.file);
@@ -290,6 +321,7 @@ async function buildCommand(args: string[]): Promise<number> {
     domain: values.domain,
     config,
     version: await appVersion(),
+    topTab: values["top-tab"],
   });
   console.log(
     `built ${api.files} API files (${api.articles} articles, ${api.days} days) + ${site.join(", ")}`,
@@ -325,6 +357,8 @@ async function main(argv: string[]): Promise<number> {
       return translateExportCommand(rest);
     case "translate-import":
       return translateImportCommand(rest);
+    case "cluster":
+      return clusterCommand(rest);
     case "build":
       return buildCommand(rest);
     case "serve":

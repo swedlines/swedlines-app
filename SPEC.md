@@ -224,7 +224,7 @@ Base URL: `https://swedlines.com/api/v1/`. All responses are JSON, UTF-8, `Cache
 | Path | Content |
 |---|---|
 | `latest.json` | The 200 most recent items across all sources (feeds the headline stream) |
-| `top.json` | Phase 2: story clusters ranked by cross-source coverage (§8) |
+| `top.json` | Story clusters ranked by cross-source coverage (§8); implemented in 1.2.0 |
 | `days/YYYY-MM-DD.json` | Full edition for one day |
 | `days/index.json` | List of available days with item counts |
 | `sources.json` | Enabled sources with names, homepages, item counts |
@@ -290,7 +290,7 @@ Reference: NewsNow's Sweden page (newsnow.co.uk/h/World+News/Europe/Northern+Eur
 - **One page, one list.** Each row: headline (link), publisher name, relative time ("12 min", "3 h"), and the publisher's teaser beneath in muted type (`sv.summary`, or `en.summary` in English view; decided 2026-11-16). No images. Rows without a teaser show the headline only.
 - **Language toggle** in the header: `sv` / `en` / `both`. Persisted in `localStorage`. "Both" shows the English headline with the Swedish original beneath in smaller type.
 - **Time-window grouping** in the Latest view: "Senaste 10 minuterna / Last 10 minutes", "Senaste timmen", "Senaste 4 timmarna", "Tidigare i dag", then by day.
-- **Tabs:** `Latest` (reverse chronological, MVP) and `Top` (phase 2, see below). No "Popular" tab until there is click data worth ranking on.
+- **Tabs:** `Latest` (reverse chronological, MVP) and `Top` (since 1.2.0, see below). No "Popular" tab until there is click data worth ranking on.
 - **Sidebar/topic links:** one link per category (§5.3), each a filtered view of the same stream. Phase 2 adds entity topics (e.g. "Ulf Kristersson", "NATO", "Riksbanken") derived from a `topics` field.
 - **My Sources:** a checkbox list of publishers, client-side filter, persisted in `localStorage`. Static site, so no account needed.
 - **Direct links.** Headlines link straight to the publisher URL, never through a redirect.
@@ -324,9 +324,16 @@ Dedicated endpoint, generated with the rest of the static API:
 
 The ticker refreshes its data every 5 minutes and dedupes by `id`, so a long-running display never repeats a headline within one pass.
 
-### Top view (phase 2)
+### Top view (implemented 2026-11-23, v1.2.0)
 
 NewsNow ranks "Top" editorially/algorithmically. The cheapest honest signal available here is **cross-source coverage**: cluster items that report the same story (title similarity across publishers within a 12-hour window, LLM-assisted), and rank clusters by publisher count, then recency. A `top.json` endpoint exposes the ranked clusters. This is also the hook for a later "one story, many sources" grouping in the stream.
+
+As implemented (`src/pipeline/cluster.ts`, `rankTopStories` in `src/build/api.ts`):
+- A `cluster` step runs after translation on every ingest run. It takes articles from the last 24 hours that are not yet in a story. A word-stem overlap pass on the Swedish headlines finds up to 6 candidate earlier articles within 12 hours; only articles with candidates go to the model (same model as translation, effort low, structured output), which picks the matching candidate or none. Articles without candidates become single-article stories without a model call. A failed batch leaves its articles ungrouped for the next run.
+- Groupings live in the content repo at `state/stories.json` (story id = id of its first article; stories quiet for 3 days are dropped). Articles stay immutable.
+- Ranking: at least 2 distinct publishers and an article in the last 12 hours; sorted by publisher count, then newest article; top 30. The lead is the earliest article's own headline; Swedlines never writes headlines.
+- Front page: the Top tab is shown when the build gets `--top-tab` (repository variable `SWEDLINES_TOP_TAB=1`); otherwise the view is reachable only at `/#top` for preview.
+- Known limit: TT wire copy republished verbatim by several outlets counts once per outlet, so syndicated stories rank high.
 
 ## 9. Operations
 

@@ -42,7 +42,7 @@ Every change pushed to `main` is a release: the site footer and `/version` show 
 - `src/config/sources.ts` loads and validates `sources.yaml`, applies defaults, and exposes `Source` objects to the pipeline. Category enum lives here (`CATEGORIES`).
 - `glossary.yaml` (loaded by `src/config/glossary.ts`) holds translation rules and Swedish→English terms; it is rendered into the translation system prompt in `src/prompts/translate.ts`. Edit the YAML to fix recurring translation issues; bump `PROMPT_VERSION` for large changes.
 - `src/cli.ts` is the single entry point; each subcommand is a function returning an exit code.
-- `src/pipeline/` is where fetch → normalize → dedupe → summarize → translate → write → build stages go (SPEC §4.3). Not yet implemented.
+- `src/pipeline/` holds the stages: fetch/parse/normalize/ingest, `translate.ts`, and `cluster.ts` (story grouping for the Top view, state in the content repo's `state/stories.json`). The workflow runs ingest → translate → cluster → build every 15 minutes.
 
 ## Core design constraints from the spec
 

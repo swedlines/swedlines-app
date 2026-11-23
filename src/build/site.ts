@@ -89,6 +89,8 @@ export async function buildSite(opts: {
   config?: SourcesConfig | undefined;
   /** Shown in every footer, e.g. { version: "0.1.0", commit: "3ee85ea" }. */
   version?: { version: string; commit?: string | undefined } | undefined;
+  /** Show the Top tab to everyone. Without it the Top view is only reachable at /#top. */
+  topTab?: boolean | undefined;
 }): Promise<string[]> {
   const written: string[] = [];
   const stamp = (html: string) => html.replace("<!--VERSION-->", renderVersion(opts.version));
@@ -96,7 +98,10 @@ export async function buildSite(opts: {
     await writeFile(join(opts.publicDir, "CNAME"), `${opts.domain}\n`, "utf8");
     written.push("CNAME");
   }
-  const index = stamp(await readFile(join(here, "templates", "index.html"), "utf8"));
+  const index = stamp(await readFile(join(here, "templates", "index.html"), "utf8")).replace(
+    'data-top-tab="off"',
+    `data-top-tab="${opts.topTab ? "on" : "off"}"`,
+  );
   await writeFile(join(opts.publicDir, "index.html"), index, "utf8");
   written.push("index.html");
 

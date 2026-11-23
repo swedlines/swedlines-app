@@ -64,11 +64,24 @@ jobs:
           else
             npm run cli --silent -- translate --content content-repo || echo "::warning::translation step failed; items stay pending"
           fi
+      - name: Group stories for the Top view
+        if: steps.gate.outputs.enabled == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SWEDLINES_MODEL: ${{ vars.SWEDLINES_MODEL }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set; skipping story grouping"
+          else
+            npm run cli --silent -- cluster --content content-repo || echo "::warning::story grouping failed; Top view keeps the previous groups"
+          fi
       - name: Build static API and site
         if: steps.gate.outputs.enabled == 'true'
         env:
           # Set this repository variable to swedlines.com once DNS points at GitHub Pages.
           SWEDLINES_DOMAIN: ${{ vars.SWEDLINES_DOMAIN }}
+          # Repository variable; set to 1 to show the Top tab to everyone (otherwise preview at /#top).
+          SWEDLINES_TOP_TAB: ${{ vars.SWEDLINES_TOP_TAB }}
         run: npm run cli --silent -- build --content content-repo
       - name: Commit and push content
         if: steps.gate.outputs.enabled == 'true'

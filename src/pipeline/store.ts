@@ -8,6 +8,7 @@ import type { FeedState } from "./fetch.ts";
  * The content repository on disk:
  *   content/YYYY/MM/DD/<id>.json   one file per article
  *   state/feeds.json               per-feed ETag / Last-Modified cache
+ *   state/stories.json             story grouping for the Top view (pipeline/cluster.ts)
  */
 export class ContentStore {
   readonly root: string;
@@ -95,5 +96,22 @@ export class ContentStore {
       `${JSON.stringify(sorted, null, 2)}\n`,
       "utf8",
     );
+  }
+
+  /** A JSON file under state/, or null when it does not exist yet. */
+  async readState(name: string): Promise<unknown> {
+    try {
+      return JSON.parse(await readFile(join(this.stateDir, name), "utf8"));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
+  }
+
+  async writeState(name: string, data: unknown): Promise<void> {
+    await mkdir(this.stateDir, { recursive: true });
+    const abs = join(this.stateDir, name);
+    await writeFile(`${abs}.tmp`, `${JSON.stringify(data, null, 2)}\n`, "utf8");
+    await rename(`${abs}.tmp`, abs);
   }
 }

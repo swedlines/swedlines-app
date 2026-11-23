@@ -3,12 +3,17 @@ import { join } from "node:path";
 import type { SourcesConfig } from "../config/sources.ts";
 import { enabledSources } from "../config/sources.ts";
 import { type Article, articleSchema } from "../model/article.ts";
+import { STORIES_STATE, type StoriesState, storiesStateSchema } from "../pipeline/cluster.ts";
 import type { ContentStore } from "../pipeline/store.ts";
 import { stockholmDate, toStockholmIso } from "../util/time.ts";
 
 export const API_PREFIX = "api/v1";
 export const LATEST_COUNT = 200;
 export const TICKER_COUNT = 50;
+/** Top view: stories need this many distinct publishers and an article within the window. */
+export const TOP_MIN_SOURCES = 2;
+export const TOP_WINDOW_HOURS = 12;
+export const TOP_COUNT = 30;
 
 export async function loadAllArticles(store: ContentStore): Promise<Article[]> {
   let files: string[];
@@ -42,6 +47,55 @@ function tickerItem(a: Article) {
     sv: { title: a.sv.title },
     ...(a.en ? { en: { title: a.en.title } } : {}),
   };
+}
+
+export interface TopStory {
+  id: string;
+  source_count: number;
+  sources: string[];
+  first_published_at: string;
+  last_published_at: string;
+  lead: Article;
+  items: ReturnType<typeof tickerItem>[];
+}
+
+/**
+ * Rank stories by distinct publishers, then by their newest article (SPEC §8). The lead is the
+ * earliest article: Swedlines shows a publisher's own headline, never one it writes itself.
+ */
+export function rankTopStories(all: Article[], state: StoriesState | null, now: Date): TopStory[] {
+  if (!state) return [];
+  const byId = new Map(all.map((a) => [a.id, a]));
+  const cutoff = now.getTime() - TOP_WINDOW_HOURS * 3_600_000;
+  const out: TopStory[] = [];
+  for (const [id, story] of Object.entries(state.stories)) {
+    const items = story.items
+      .map((i) => byId.get(i))
+      .filter((a): a is Article => !!a)
+      .sort((a, b) => a.published_at.localeCompare(b.published_at) || a.id.localeCompare(b.id));
+    const lead = items[0];
+    const last = items.at(-1);
+    if (!lead || !last) continue;
+    const sources = [...new Set(items.map((a) => a.source))];
+    if (sources.length < TOP_MIN_SOURCES) continue;
+    if (new Date(last.published_at).getTime() < cutoff) continue;
+    out.push({
+      id,
+      source_count: sources.length,
+      sources,
+      first_published_at: lead.published_at,
+      last_published_at: last.published_at,
+      lead,
+      items: [...items].reverse().map(tickerItem),
+    });
+  }
+  out.sort(
+    (a, b) =>
+      b.source_count - a.source_count ||
+      new Date(b.last_published_at).getTime() - new Date(a.last_published_at).getTime() ||
+      a.id.localeCompare(b.id),
+  );
+  return out.slice(0, TOP_COUNT);
 }
 
 async function writeJson(root: string, rel: string, data: unknown): Promise<void> {
@@ -79,6 +133,10 @@ export async function buildApi(opts: {
     count: Math.min(TICKER_COUNT, all.length),
     items: all.slice(0, TICKER_COUNT).map(tickerItem),
   });
+
+  const rawStories = await opts.store.readState(STORIES_STATE);
+  const top = rankTopStories(all, rawStories ? storiesStateSchema.parse(rawStories) : null, now);
+  await put("top.json", { generated_at: generatedAt, count: top.length, stories: top });
 
   const byDay = new Map<string, Article[]>();
   for (const a of all) {

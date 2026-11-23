@@ -42,6 +42,13 @@ describe("buildApi + buildSite", () => {
     expect(latest.count).toBe(200);
     expect(latest.items[0].published_at >= latest.items[199].published_at).toBe(true);
 
+    // No grouping has run on this fixture, so the Top endpoint exists but is empty.
+    expect(await read("top.json")).toEqual({
+      generated_at: "2026-11-14T13:00:00+01:00",
+      count: 0,
+      stories: [],
+    });
+
     const ticker = await read("ticker.json");
     expect(ticker.count).toBe(50);
     expect(Object.keys(ticker.items[0]).sort()).toEqual([
